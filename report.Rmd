@@ -1,0 +1,126 @@
+---
+title: "Report on Wikipedia Portal A/B Test"
+subtitle: "Descriptive Text for Sister Project Links"
+author:
+- Mikhail Popov (Analysis & Report)
+- Jan Drewniak (UX Engineering)
+- Deborah Tankersley (Product Management)
+date: "May 18, 2016"
+fontsize: 11pt
+geometry: margin=0.5in
+output:
+  pdf_document:
+    fig_caption: yes
+    fig_height: 4
+    fig_width: 5
+    includes:
+      in_header: header.tex
+    latex_engine: xelatex
+---
+
+```{r setup, include = FALSE, message = FALSE, warning = FALSE}
+knitr::opts_chunk$set(echo = FALSE, message = FALSE, warning = FALSE)
+set.seed(0)
+sessions <- readr::read_rds("data/refined.rds")
+```
+
+```{r helper_functions}
+library(magrittr)
+library(tidyr)
+import::from(dplyr, group_by, summarize, ungroup, mutate, rename, keep_where = filter, arrange)
+library(ggplot2)
+library(cowplot)
+library(BCDA)
+flip_rows <- function(x) {
+  return(x[rev(1:nrow(x)), ])
+}
+flip_cols <- function(x) {
+  return(x[, rev(1:ncol(x))])
+}
+df_to_table <- function(x) {
+  y <- as.matrix(x[, -1])
+  rownames(y) <- x[[1]]
+  colnames(y) <- names(x)[-1]
+  return(as.table(y))
+}
+plot_props <- function(data) {
+  beta_binom_fit <- summary(beta_binom(df_to_table(data)[c("test", "controls"), ]),
+                            interval_type = "HPD")[1:2, ]
+  beta_binom_fit$group <- c("test", "controls")
+  data$proportion <- data[, 2]/apply(data[, -1], 1, sum)
+  p <- data %>%
+    dplyr::left_join(beta_binom_fit, by = "group") %>%
+    ggplot(aes(x = group, y = proportion, fill = group)) +
+    geom_bar(stat = "identity") +
+    geom_pointrange(aes(y = estimate, ymin = conf.low, ymax = conf.high)) +
+    scale_y_continuous("Proportion of sessions",
+                       labels = scales::percent_format())
+  return(p)
+}
+```
+
+\renewcommand{\abstractname}{Executive Summary}
+\begin{abstract}
+...
+\end{abstract}
+
+## Introduction
+
+## Methods
+
+## Results
+
+### First Visit
+
+```{r first_visit}
+# Other project clickthroughs vs bounces on first visit
+first_visit <- sessions %>%
+  keep_where(visit == 1) %>%
+  group_by(group) %>%
+  mutate(clicked = ifelse(is.na(clicked), "bounce", clicked)) %>%
+  summarize(visited = sum(clicked == "other projects"),
+            bounced = sum(clicked == "bounce"),
+            other = sum(clicked != "other projects"))
+```
+
+```{r first_visit_bounces, fig.cap = "...some caption..."}
+gg <- plot_props(first_visit[, c("group", "visited", "bounced")]) +
+  scale_fill_discrete(guide = FALSE) +
+  ggtitle("Proportion of sister project clicks on first visit",
+          subtitle = "Not counting other kinds of clicks")
+print(gg)
+```
+
+```{r first_visit_other, fig.cap = "...some caption..."}
+plot_props(first_visit[, c("group", "visited", "other")]) +
+  scale_fill_discrete(guide = FALSE) +
+  ggtitle("Proportion of sister project clicks on first visit")
+```
+
+### Overall
+
+```{r overall}
+# Other project clickthroughs vs bounces overall
+clickthru_overall <- sessions %>%
+  keep_where(visit > 0) %>%
+  group_by(group) %>%
+  mutate(clicked = ifelse(is.na(clicked), "bounce", clicked)) %>%
+  summarize(visited = sum(clicked == "other projects"),
+            bounced = sum(clicked == "bounce"),
+            other = sum(clicked != "other projects"))
+```
+
+```{r overall_bounces, fig.cap = "...some caption..."}
+plot_props(clickthru_overall[, c("group", "visited", "bounced")]) +
+  scale_fill_discrete(guide = FALSE) +
+  ggtitle("Proportion of sister project clicks overall",
+          subtitle = "Not counting other kinds of clicks")
+```
+
+```{r overall_other, fig.cap = "...some caption..."}
+plot_props(clickthru_overall[, c("group", "visited", "other")]) +
+  scale_fill_discrete(guide = FALSE) +
+  ggtitle("Proportion of sister project clicks overall")
+```
+
+## Conclusion and Discussion
