@@ -1,21 +1,22 @@
 ---
 title: "Report on Wikipedia Portal A/B Test"
-subtitle: "Descriptive Text for Sister Project Links"
 author:
 - Mikhail Popov (Analysis & Report)
 - Jan Drewniak (UX Engineering)
 - Deborah Tankersley (Product Management)
-date: "May 18, 2016"
-fontsize: 11pt
-geometry: margin=0.5in
+date: "May 19, 2016"
 output:
   pdf_document:
     fig_caption: yes
-    fig_height: 4
+    fig_height: 7
     fig_width: 5
     includes:
       in_header: header.tex
     latex_engine: xelatex
+  html_document: default
+geometry: margin=1in
+subtitle: Descriptive Text for Sister Project Links
+fontsize: 12pt
 ---
 
 ```{r setup, include = FALSE, message = FALSE, warning = FALSE}
@@ -53,7 +54,7 @@ plot_props <- function(data) {
     ggplot(aes(x = group, y = proportion, fill = group)) +
     geom_bar(stat = "identity") +
     geom_pointrange(aes(y = estimate, ymin = conf.low, ymax = conf.high)) +
-    scale_y_continuous("Proportion of sessions",
+    scale_y_continuous("Proportion // Probability",
                        labels = scales::percent_format())
   return(p)
 }
@@ -61,16 +62,32 @@ plot_props <- function(data) {
 
 \renewcommand{\abstractname}{Executive Summary}
 \begin{abstract}
-...
+In the most recent Wikipedia Portal A/B test, we added descriptions to the other Wikimedia projects at the bottom of wikipedia.org to raise awareness of those projects and help the Portal visitor make an informed decision before clicking on one of those links.
+
+We ran the test for 7 days between 3 May 2016 and 10 May 2016 and recorded 22.4K visits to the Portal by 17.5K unique sessions enrolled into the A/B test. 45 visits resulted in a click on a link to one of the sister projects, which is consistent with the 0.2-0.4\% clickthrough rate we observe on the Wikipedia Portal dashboard.
+
+A Bayesian analysis showed that the test group was slightly more likely than the control group to visit the other projects, but these results are unreliable due to the small amount of data available. In other words: the best case scenario is that the change is actually posit\\ive, and the worst case scenario is that the change isn't negative or at least inconclusive.
+
+On 18 May 2016, we deployed the change to production (see T133732) and as of 19 May 2016, this is the default experience for anyone visiting wikipedia.org.
 \end{abstract}
 
-## Introduction
+\newpage
 
-## Methods
+## Background
+
+In this report, we look at the Wikipedia Portal A/B test wherein we redesigned the footer of the page containing links to other Wikimedia projects, such as Commons, Wikibooks, and Wikidata. The idea behind the redesign is that we want wikipedia.org visitors to be able to make informed decisions when clicking any of those links. We also wanted to raise awareness for Wikipedia's sister projects, and we think that having the descriptions of the projects is a positive change in user experience. See the Phabricator task [T131238](https://phabricator.wikimedia.org/T131238) for more details and tasks related to this A/B test.
+
+![Demonstration of change.](Screen Shot 2016-05-19 at 4.14.07 PM.png)
+
+We deployed the A/B test from 3 May 2016 until 10 May 2016. 0.5% of the users were selected into event logging, and approximately 40% of users whose preferred languages list included English were enrolled into the A/B test as either a control or a test subject.
+
+We used our R package [BCDA](https://github.com/bearloga/BCDA) to perform a Bayesian analysis of the data using a Beta-Binomial model of success probabilities.
 
 ## Results
 
-### First Visit
+Unfortunately, the "other projects" section of the Portal page gets so little traffic (by being so far below the fold) that we only recorded a few clicks. Out of the 22.4K recorded visits to the Portal by 17.5K unique sessions enrolled into the A/B test, 45 visits resulted in a click on a link to one of the sister projects. Specifically, 25 of the 45 clicks were made by sessions enrolled into the test group, while the remaining 20 clicks were made by the control group.
+
+We found that the test group had an approximately 0.14% (-0.17%, 0.46%) higher probability of visiting a sister project on the first visit, and was approximately 1.43 (RR: 0.69, 2.68) times more likely to visit a sister project than the control group on the first visit. However, the Bayesian 95% credible intervals do include 0 and 1, respectively, so while the evidence does point toward a positive change rather than a negative change, the intervals are wide enough that the results are inconclusive.
 
 ```{r first_visit}
 # Other project clickthroughs vs bounces on first visit
@@ -81,23 +98,8 @@ first_visit <- sessions %>%
   summarize(visited = sum(clicked == "other projects"),
             bounced = sum(clicked == "bounce"),
             other = sum(clicked != "other projects"))
+# set.seed(0); first_visit[, c("group", "visited", "bounced")] %>% df_to_table %>% flip_rows %>% beta_binom
 ```
-
-```{r first_visit_bounces, fig.cap = "...some caption..."}
-gg <- plot_props(first_visit[, c("group", "visited", "bounced")]) +
-  scale_fill_discrete(guide = FALSE) +
-  ggtitle("Proportion of sister project clicks on first visit",
-          subtitle = "Not counting other kinds of clicks")
-print(gg)
-```
-
-```{r first_visit_other, fig.cap = "...some caption..."}
-plot_props(first_visit[, c("group", "visited", "other")]) +
-  scale_fill_discrete(guide = FALSE) +
-  ggtitle("Proportion of sister project clicks on first visit")
-```
-
-### Overall
 
 ```{r overall}
 # Other project clickthroughs vs bounces overall
@@ -110,17 +112,28 @@ clickthru_overall <- sessions %>%
             other = sum(clicked != "other projects"))
 ```
 
-```{r overall_bounces, fig.cap = "...some caption..."}
-plot_props(clickthru_overall[, c("group", "visited", "bounced")]) +
+\newpage
+
+```{r first_visit_bounces, fig.cap = "Proportion of first visits that ended in a visit to a sister."}
+p1 <- plot_props(first_visit[, c("group", "visited", "bounced")]) +
+  scale_fill_discrete(guide = FALSE) +
+  ggtitle("Proportion of sister project clicks on first visit",
+          subtitle = "Not counting other kinds of clicks, just bouncing off the page")
+p2<- plot_props(first_visit[, c("group", "visited", "other")]) +
+  scale_fill_discrete(guide = FALSE) +
+  ggtitle("Proportion of sister project clicks on first visit")
+plot_grid(p1, p2, nrow = 2)
+```
+
+\newpage
+
+```{r overall_bounces, fig.cap = "Proportion of all visits that ended in a visit to a sister project."}
+p1 <- plot_props(clickthru_overall[, c("group", "visited", "bounced")]) +
   scale_fill_discrete(guide = FALSE) +
   ggtitle("Proportion of sister project clicks overall",
-          subtitle = "Not counting other kinds of clicks")
-```
-
-```{r overall_other, fig.cap = "...some caption..."}
-plot_props(clickthru_overall[, c("group", "visited", "other")]) +
+          subtitle = "Not counting other kinds of clicks, just bouncing off the page")
+p2 <- plot_props(clickthru_overall[, c("group", "visited", "other")]) +
   scale_fill_discrete(guide = FALSE) +
   ggtitle("Proportion of sister project clicks overall")
+plot_grid(p1, p2, nrow = 2)
 ```
-
-## Conclusion and Discussion
